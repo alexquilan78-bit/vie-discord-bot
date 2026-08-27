@@ -2,9 +2,9 @@ name: VIE Watcher
 
 on:
   schedule:
-    # Toutes les 30 minutes. GitHub peut décaler légèrement l'horaire réel,
+    # Toutes les 5 minutes. GitHub peut décaler légèrement l'horaire réel,
     # c'est normal. Modifie cette valeur si tu veux vérifier plus/moins souvent.
-    - cron: "*/30 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
     inputs:
       seed_only:
