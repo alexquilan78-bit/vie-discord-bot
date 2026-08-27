@@ -42,25 +42,30 @@ def save_json(path: Path, data) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def matches_criteria(text: str, criteria: dict) -> bool:
-    """Retourne True si le texte de l'offre correspond aux critères.
+def matches_criteria(title: str, details: dict, criteria: dict) -> bool:
+    """Retourne True si l'offre correspond aux critères.
 
-    - keywords: au moins UN mot-clé doit apparaître (titre, poste, description...)
-    - countries: au moins UN pays doit apparaître
-    - exclude_keywords: si un seul de ces mots apparaît, l'offre est rejetée
+    - countries: comparé au champ "localisation" spécifiquement (au moins UN pays doit y apparaître)
+    - keywords: comparé au champ "domaine" spécifiquement (au moins UN mot-clé doit y apparaître)
+    - exclude_keywords: si un seul de ces mots apparaît n'importe où, l'offre est rejetée
+    Si un champ n'a pas pu être extrait de la page, on retombe sur une recherche dans
+    tout le texte de l'offre (titre + tous les champs) pour ne pas rater une offre valable.
     Une catégorie vide dans criteria.json n'est pas prise en compte (pas de filtre).
     """
-    text_low = text.lower()
+    fallback_text = build_search_text(title, details).lower()
+
+    localisation_text = (details.get("localisation") or fallback_text).lower()
+    domaine_text = (details.get("domaine") or fallback_text).lower()
 
     keywords = [k.lower() for k in criteria.get("keywords", [])]
     countries = [c.lower() for c in criteria.get("countries", [])]
     exclude = [e.lower() for e in criteria.get("exclude_keywords", [])]
 
-    if exclude and any(e in text_low for e in exclude):
+    if exclude and any(e in fallback_text for e in exclude):
         return False
-    if keywords and not any(k in text_low for k in keywords):
+    if countries and not any(c in localisation_text for c in countries):
         return False
-    if countries and not any(c in text_low for c in countries):
+    if keywords and not any(k in domaine_text for k in keywords):
         return False
     return True
 
@@ -72,6 +77,7 @@ FIELD_LABELS = {
     "indemnite": ["Indemnité", "Indemnite", "Indemnité mensuelle"],
     "debut": ["Début", "Debut", "Date de début"],
     "reference": ["Référence", "Reference", "Réf."],
+    "domaine": ["Domaine de compétences", "Domaine de competences", "Domaine", "Secteur d'activité", "Compétence"],
 }
 
 
@@ -178,7 +184,7 @@ def scrape_offer_detail(browser, url: str, debug: bool = False) -> dict:
 
 
 def build_search_text(title: str, details: dict) -> str:
-    """Texte concaténé utilisé pour le filtrage par mots-clés / pays."""
+    """Texte concaténé utilisé comme filet de secours si un champ n'est pas trouvé."""
     parts = [title] + [v for v in details.values() if v]
     return " ".join(parts)
 
@@ -200,6 +206,7 @@ def send_discord_notification(offer_url: str, title: str, details: dict) -> None
                     {"name": "💰 Indemnité", "value": val("indemnite"), "inline": True},
                     {"name": "📅 Début", "value": val("debut"), "inline": True},
                     {"name": "📇 Référence", "value": val("reference"), "inline": True},
+                    {"name": "🎯 Domaine", "value": val("domaine"), "inline": True},
                     {
                         "name": "🔗 Lien",
                         "value": f"[Voir l'offre sur Business France]({offer_url})",
@@ -249,9 +256,8 @@ def main() -> None:
                     continue
 
                 title = details.pop("title")
-                search_text = build_search_text(title, details)
 
-                if matches_criteria(search_text, criteria):
+                if matches_criteria(title, details, criteria):
                     print(f"-> Nouvelle offre correspondante: {offer['url']}")
                     try:
                         send_discord_notification(offer["url"], title, details)
