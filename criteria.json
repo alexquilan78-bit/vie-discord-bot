@@ -1,5 +1,21 @@
 {
-  "keywords": ["data", "marketing digital"],
-  "countries": ["Canada", "Allemagne", "Espagne"],
+  "keywords": [
+    "finance",
+    "accounting",
+    "controlling",
+    "banking",
+    "business",
+    "marketing",
+    "communication",
+    "information",
+    "media"
+  ],
+  "countries": [
+    "Canada",
+    "Etats-Unis",
+    "États-Unis",
+    "USA",
+    "Australie"
+  ],
   "exclude_keywords": []
 }
