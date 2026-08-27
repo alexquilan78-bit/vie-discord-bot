@@ -1,0 +1,51 @@
+name: VIE Watcher
+
+on:
+  schedule:
+    # Toutes les 30 minutes. GitHub peut décaler légèrement l'horaire réel,
+    # c'est normal. Modifie cette valeur si tu veux vérifier plus/moins souvent.
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+    inputs:
+      seed_only:
+        description: "Ne pas notifier, marquer seulement les offres actuelles comme déjà vues"
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
+
+jobs:
+  check-offers:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps chromium
+
+      - name: Run watcher
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if [ "${{ github.event.inputs.seed_only }}" = "true" ]; then
+            python vie_watcher.py --seed-only
+          else
+            python vie_watcher.py
+          fi
+
+      - name: Commit updated seen_offers.json
+        run: |
+          git config user.name "vie-watcher-bot"
+          git config user.email "actions@github.com"
+          git add seen_offers.json
+          git diff --cached --quiet || git commit -m "Update seen offers [skip ci]"
+          git push
